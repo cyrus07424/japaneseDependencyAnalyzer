@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { MorphemeToken, DependencyRelation, AnalysisResult } from './types';
 import { DependencyParser } from './dependency-parser';
-import { SimpleJapaneseAnalyzer, SimpleMorpheme } from './simple-analyzer';
+import { KuromojiAnalyzer } from './kuromoji-analyzer';
 
 export default function JapaneseAnalyzer() {
   const [inputText, setInputText] = useState('');
@@ -13,38 +13,39 @@ export default function JapaneseAnalyzer() {
   const [isReady, setIsReady] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dependencyParser = new DependencyParser();
-  const simpleAnalyzer = new SimpleJapaneseAnalyzer();
+  const [kuromojiAnalyzer] = useState(() => new KuromojiAnalyzer());
 
-  // Initialize analyzer (no external dependencies needed)
+  // Initialize analyzer with kuromoji
   useEffect(() => {
-    setIsReady(true);
-  }, []);
+    const initAnalyzer = async () => {
+      try {
+        await kuromojiAnalyzer.initialize();
+        setIsReady(true);
+      } catch (error) {
+        console.error('Failed to initialize kuromoji analyzer:', error);
+      }
+    };
+    
+    initAnalyzer();
+  }, [kuromojiAnalyzer]);
 
-  const analyzeText = () => {
-    if (!inputText.trim()) return;
+  const analyzeText = async () => {
+    console.log('analyzeText called', { inputText: inputText.trim(), isReady: kuromojiAnalyzer.isReady() });
+    
+    if (!inputText.trim() || !kuromojiAnalyzer.isReady()) return;
 
     setIsLoading(true);
 
     try {
-      // Perform morphological analysis using simple analyzer
-      const simpleTokens = simpleAnalyzer.tokenize(inputText);
-      
-      // Convert to our MorphemeToken format
-      const morphemes: MorphemeToken[] = simpleTokens.map((token: SimpleMorpheme) => ({
-        surface_form: token.surface,
-        pos: token.pos,
-        pos_detail_1: token.pos,
-        pos_detail_2: '',
-        pos_detail_3: '',
-        conjugated_type: '',
-        conjugated_form: '',
-        basic_form: token.basicForm,
-        reading: token.reading,
-        pronunciation: token.reading
-      }));
+      // Perform morphological analysis using kuromoji
+      console.log('Starting morphological analysis...');
+      const morphemes = kuromojiAnalyzer.tokenize(inputText);
+      console.log('Morphemes:', morphemes);
 
       // Perform dependency analysis
+      console.log('Starting dependency analysis...');
       const dependencies = dependencyParser.parseDependencies(morphemes);
+      console.log('Dependencies:', dependencies);
 
       setAnalysisResult({
         morphemes,
@@ -187,7 +188,7 @@ export default function JapaneseAnalyzer() {
               disabled={isLoading || !isReady || !inputText.trim()}
               className="mt-4 bg-blue-500 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
             >
-              {isLoading ? '解析中...' : '解析開始'}
+              {isLoading ? '解析中...' : isReady ? '解析開始' : '辞書読み込み中...'}
             </button>
           </div>
 
