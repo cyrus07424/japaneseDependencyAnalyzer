@@ -13,7 +13,7 @@ export class KuromojiAnalyzer {
    */
   async initialize(): Promise<void> {
     return new Promise((resolve, reject) => {
-      kuromoji.builder({ dicPath: '/dict' })
+      kuromoji.builder({ dicPath: './dict' })
         .build((err: any, tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures>) => {
           if (err) {
             reject(err);
