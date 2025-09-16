@@ -19,7 +19,25 @@ export interface DependencyRelation {
   label: string;           // 関係ラベル
 }
 
+// Types for 5W1H analysis
+export interface FiveW1HElement {
+  category: 'who' | 'what' | 'when' | 'where' | 'why' | 'how';  // 5W1H カテゴリ
+  text: string;                                                 // 抽出されたテキスト
+  morphemeIndices: number[];                                    // 関連する形態素のインデックス
+  confidence: number;                                           // 信頼度 (0-1)
+}
+
+export interface FiveW1HResult {
+  who: FiveW1HElement[];      // 誰が
+  what: FiveW1HElement[];     // 何を
+  when: FiveW1HElement[];     // いつ
+  where: FiveW1HElement[];    // どこで
+  why: FiveW1HElement[];      // なぜ
+  how: FiveW1HElement[];      // どのように
+}
+
 export interface AnalysisResult {
   morphemes: MorphemeToken[];
   dependencies: DependencyRelation[];
+  fiveW1H?: FiveW1HResult;
 }
