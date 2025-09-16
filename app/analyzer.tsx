@@ -5,6 +5,7 @@ import * as d3 from 'd3';
 import { MorphemeToken, DependencyRelation, AnalysisResult } from './types';
 import { DependencyParser } from './dependency-parser';
 import { KuromojiAnalyzer } from './kuromoji-analyzer';
+import { FiveW1HAnalyzer } from './five-w1h-analyzer';
 
 export default function JapaneseAnalyzer() {
   const [inputText, setInputText] = useState('');
@@ -13,6 +14,7 @@ export default function JapaneseAnalyzer() {
   const [isReady, setIsReady] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dependencyParser = new DependencyParser();
+  const fiveW1HAnalyzer = new FiveW1HAnalyzer();
   const [kuromojiAnalyzer] = useState(() => new KuromojiAnalyzer());
 
   // Initialize analyzer with kuromoji
@@ -41,9 +43,13 @@ export default function JapaneseAnalyzer() {
       // Perform dependency analysis
       const dependencies = dependencyParser.parseDependencies(morphemes);
 
+      // Perform 5W1H analysis
+      const fiveW1H = fiveW1HAnalyzer.analyze(morphemes, dependencies);
+
       setAnalysisResult({
         morphemes,
-        dependencies
+        dependencies,
+        fiveW1H
       });
 
     } catch (error) {
@@ -252,6 +258,128 @@ export default function JapaneseAnalyzer() {
                   ))}
                 </div>
               </div>
+
+              {/* 5W1H Analysis Results */}
+              {analysisResult.fiveW1H && (
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">5W1H抽出結果</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Who (誰が) */}
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-medium text-blue-800 mb-2">誰が (Who)</h3>
+                      {analysisResult.fiveW1H.who.length > 0 ? (
+                        <div className="space-y-1">
+                          {analysisResult.fiveW1H.who.map((element, index) => (
+                            <div key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              <span className="font-medium text-blue-700">{element.text}</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                (信頼度: {Math.round(element.confidence * 100)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">検出されませんでした</div>
+                      )}
+                    </div>
+
+                    {/* What (何を) */}
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-lg font-medium text-green-800 mb-2">何を (What)</h3>
+                      {analysisResult.fiveW1H.what.length > 0 ? (
+                        <div className="space-y-1">
+                          {analysisResult.fiveW1H.what.map((element, index) => (
+                            <div key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              <span className="font-medium text-green-700">{element.text}</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                (信頼度: {Math.round(element.confidence * 100)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">検出されませんでした</div>
+                      )}
+                    </div>
+
+                    {/* When (いつ) */}
+                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                      <h3 className="text-lg font-medium text-purple-800 mb-2">いつ (When)</h3>
+                      {analysisResult.fiveW1H.when.length > 0 ? (
+                        <div className="space-y-1">
+                          {analysisResult.fiveW1H.when.map((element, index) => (
+                            <div key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              <span className="font-medium text-purple-700">{element.text}</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                (信頼度: {Math.round(element.confidence * 100)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">検出されませんでした</div>
+                      )}
+                    </div>
+
+                    {/* Where (どこで) */}
+                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                      <h3 className="text-lg font-medium text-orange-800 mb-2">どこで (Where)</h3>
+                      {analysisResult.fiveW1H.where.length > 0 ? (
+                        <div className="space-y-1">
+                          {analysisResult.fiveW1H.where.map((element, index) => (
+                            <div key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              <span className="font-medium text-orange-700">{element.text}</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                (信頼度: {Math.round(element.confidence * 100)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">検出されませんでした</div>
+                      )}
+                    </div>
+
+                    {/* Why (なぜ) */}
+                    <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                      <h3 className="text-lg font-medium text-red-800 mb-2">なぜ (Why)</h3>
+                      {analysisResult.fiveW1H.why.length > 0 ? (
+                        <div className="space-y-1">
+                          {analysisResult.fiveW1H.why.map((element, index) => (
+                            <div key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              <span className="font-medium text-red-700">{element.text}</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                (信頼度: {Math.round(element.confidence * 100)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">検出されませんでした</div>
+                      )}
+                    </div>
+
+                    {/* How (どのように) */}
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                      <h3 className="text-lg font-medium text-indigo-800 mb-2">どのように (How)</h3>
+                      {analysisResult.fiveW1H.how.length > 0 ? (
+                        <div className="space-y-1">
+                          {analysisResult.fiveW1H.how.map((element, index) => (
+                            <div key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              <span className="font-medium text-indigo-700">{element.text}</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                (信頼度: {Math.round(element.confidence * 100)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">検出されませんでした</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

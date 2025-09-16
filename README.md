@@ -6,6 +6,7 @@ A web-based tool for performing morphological analysis and dependency parsing on
 
 - **Morphological Analysis (形態素解析)**: Break down Japanese text into individual morphemes with detailed grammatical information using kuromoji.js with IPAdic dictionary
 - **Dependency Parsing (係り受け解析)**: Analyze grammatical dependencies between morphemes using CaboCha-inspired logic
+- **5W1H Extraction (5W1H抽出)**: Extract Who, What, When, Where, Why, and How elements from the text with confidence scores
 - **Visual Graph (グラフ表示)**: Interactive dependency relationship visualization using D3.js
 - **Real-time Analysis (リアルタイム解析)**: Instant analysis results as you type
 
@@ -54,10 +55,11 @@ npm start
 
 1. Enter Japanese text in the input textarea (日本語テキストを入力してください)
 2. Click the "解析開始" (Start Analysis) button
-3. View the results in three sections:
+3. View the results in four sections:
    - **Morphological Analysis Table (形態素解析結果)**: Detailed breakdown of each morpheme
    - **Dependency Graph (係り受け関係グラフ)**: Visual representation of dependencies
    - **Dependency Relations (係り受け解析結果)**: List of all dependency relationships
+   - **5W1H Extraction (5W1H抽出結果)**: Extracted Who, What, When, Where, Why, and How elements with confidence scores
 
 ## Analysis Features
 
@@ -77,13 +79,18 @@ The tool identifies various types of grammatical relationships:
 
 ## Example
 
-Input: `今日は良い天気です。`
+Input: `先生が教室で学生にゆっくり英語を教えました。`
 
 The tool will:
-1. Break it into morphemes: 今, 日, は, 良, い, 天, 気, で, す。
+1. Break it into morphemes: 先生, が, 教室, で, 学生, に, ゆっくり, 英語, を, 教え, まし, た, 。
 2. Analyze parts of speech for each morpheme
 3. Determine dependency relationships between morphemes
-4. Visualize the dependencies in an interactive graph
+4. Extract 5W1H elements:
+   - Who (誰が): 先生 (teacher)
+   - What (何を): 英語 (English), 教える (teach)
+   - Where (どこで): 教室 (classroom)
+   - How (どのように): ゆっくり (slowly)
+5. Visualize the dependencies in an interactive graph
 
 ## Development
 
