@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Japanese Dependency Analyzer (日本語係り受け解析器)
+
+A web-based tool for performing morphological analysis and dependency parsing on Japanese text. This tool provides comprehensive analysis of Japanese sentences with visual dependency graphs.
+
+## Features (機能)
+
+- **Morphological Analysis (形態素解析)**: Break down Japanese text into individual morphemes with detailed grammatical information
+- **Dependency Parsing (係り受け解析)**: Analyze grammatical dependencies between morphemes using CaboCha-inspired logic
+- **Visual Graph (グラフ表示)**: Interactive dependency relationship visualization using D3.js
+- **Real-time Analysis (リアルタイム解析)**: Instant analysis results as you type
+
+## Technology Stack
+
+- **Frontend**: Next.js 15.5.3 with React 19
+- **Styling**: Tailwind CSS 4
+- **Visualization**: D3.js for dependency graphs
+- **Language**: TypeScript
+- **Analysis Engine**: Custom Japanese morphological analyzer with dependency parsing
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18 or higher
+- npm or yarn
 
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/cyrus07424/japaneseDependencyAnalyzer.git
+cd japaneseDependencyAnalyzer
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Run the development server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-## Learn More
+### Production Build
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+npm start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Usage (使い方)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Enter Japanese text in the input textarea (日本語テキストを入力してください)
+2. Click the "解析開始" (Start Analysis) button
+3. View the results in three sections:
+   - **Morphological Analysis Table (形態素解析結果)**: Detailed breakdown of each morpheme
+   - **Dependency Graph (係り受け関係グラフ)**: Visual representation of dependencies
+   - **Dependency Relations (係り受け解析結果)**: List of all dependency relationships
 
-## Deploy on Vercel
+## Analysis Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Morphological Analysis
+- Surface form (表層形): The original word as it appears in the text
+- Part of speech (品詞): Grammatical category (noun, verb, adjective, etc.)
+- Basic form (基本形): Dictionary form of the word
+- Reading (読み): Phonetic reading
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Dependency Analysis
+The tool identifies various types of grammatical relationships:
+- **格関係 (Case Relations)**: Relationships involving particles
+- **連体修飾 (Adnominal Modification)**: Adjective-noun modifications
+- **連用修飾 (Adverbial Modification)**: Adverb-verb modifications
+- **述語関係 (Predicate Relations)**: Verb-auxiliary relationships
+- **依存関係 (General Dependencies)**: Other grammatical dependencies
+
+## Example
+
+Input: `今日は良い天気です。`
+
+The tool will:
+1. Break it into morphemes: 今, 日, は, 良, い, 天, 気, で, す。
+2. Analyze parts of speech for each morpheme
+3. Determine dependency relationships between morphemes
+4. Visualize the dependencies in an interactive graph
+
+## Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server with Turbopack
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+
+### Project Structure
+
+```
+app/
+├── analyzer.tsx           # Main analyzer component
+├── dependency-parser.ts   # Dependency analysis logic
+├── simple-analyzer.ts     # Morphological analysis engine
+├── types.ts              # TypeScript type definitions
+├── layout.tsx            # App layout
+├── page.tsx              # Main page
+└── globals.css           # Global styles
+```
+
+## License
+
+This project is licensed under the MIT License.
+
+## Author
+
+Created by [cyrus](https://github.com/cyrus07424)
