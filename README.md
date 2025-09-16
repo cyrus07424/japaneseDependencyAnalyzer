@@ -4,7 +4,7 @@ A web-based tool for performing morphological analysis and dependency parsing on
 
 ## Features (機能)
 
-- **Morphological Analysis (形態素解析)**: Break down Japanese text into individual morphemes with detailed grammatical information
+- **Morphological Analysis (形態素解析)**: Break down Japanese text into individual morphemes with detailed grammatical information using kuromoji.js with IPAdic dictionary
 - **Dependency Parsing (係り受け解析)**: Analyze grammatical dependencies between morphemes using CaboCha-inspired logic
 - **Visual Graph (グラフ表示)**: Interactive dependency relationship visualization using D3.js
 - **Real-time Analysis (リアルタイム解析)**: Instant analysis results as you type
@@ -15,7 +15,7 @@ A web-based tool for performing morphological analysis and dependency parsing on
 - **Styling**: Tailwind CSS 4
 - **Visualization**: D3.js for dependency graphs
 - **Language**: TypeScript
-- **Analysis Engine**: Custom Japanese morphological analyzer with dependency parsing
+- **Analysis Engine**: kuromoji.js with IPAdic dictionary for morphological analysis and custom dependency parsing
 
 ## Getting Started
 
@@ -100,7 +100,7 @@ The tool will:
 app/
 ├── analyzer.tsx           # Main analyzer component
 ├── dependency-parser.ts   # Dependency analysis logic
-├── simple-analyzer.ts     # Morphological analysis engine
+├── kuromoji-analyzer.ts   # Kuromoji-based morphological analysis engine
 ├── types.ts              # TypeScript type definitions
 ├── layout.tsx            # App layout
 ├── page.tsx              # Main page

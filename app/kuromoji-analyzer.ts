@@ -1,4 +1,5 @@
 // Kuromoji-based Japanese text analyzer
+// Uses kuromoji.js with IPAdic dictionary for accurate morphological analysis
 import * as kuromoji from 'kuromoji';
 import { MorphemeToken } from './types';
 
@@ -8,6 +9,7 @@ export class KuromojiAnalyzer {
 
   /**
    * Initialize the kuromoji tokenizer with local IPAdic dictionary
+   * Dictionary files are served from /public/dict/ directory
    */
   async initialize(): Promise<void> {
     return new Promise((resolve, reject) => {

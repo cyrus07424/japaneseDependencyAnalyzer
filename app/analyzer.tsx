@@ -30,22 +30,16 @@ export default function JapaneseAnalyzer() {
   }, [kuromojiAnalyzer]);
 
   const analyzeText = async () => {
-    console.log('analyzeText called', { inputText: inputText.trim(), isReady: kuromojiAnalyzer.isReady() });
-    
     if (!inputText.trim() || !kuromojiAnalyzer.isReady()) return;
 
     setIsLoading(true);
 
     try {
       // Perform morphological analysis using kuromoji
-      console.log('Starting morphological analysis...');
       const morphemes = kuromojiAnalyzer.tokenize(inputText);
-      console.log('Morphemes:', morphemes);
 
       // Perform dependency analysis
-      console.log('Starting dependency analysis...');
       const dependencies = dependencyParser.parseDependencies(morphemes);
-      console.log('Dependencies:', dependencies);
 
       setAnalysisResult({
         morphemes,
