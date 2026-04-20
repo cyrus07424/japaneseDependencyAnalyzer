@@ -1,14 +1,21 @@
 // 5W1H Analysis for Japanese text
 // Extracts Who, What, When, Where, Why, How elements from morphological analysis results
 
-import { MorphemeToken, DependencyRelation, FiveW1HElement, FiveW1HResult } from './types';
+import { MorphemeToken, DependencyRelation, Chunk, ChunkDependency, FiveW1HElement, FiveW1HResult } from './types';
 
 export class FiveW1HAnalyzer {
   
   /**
-   * Analyze 5W1H elements from morphological analysis and dependency parsing results
+   * Analyze 5W1H elements using chunk-level dependency information.
+   * When chunks/chunkDependencies are provided the analysis is more accurate
+   * because it operates on bunsetsu (文節) units as CaboCha would produce them.
    */
-  analyze(morphemes: MorphemeToken[], dependencies: DependencyRelation[]): FiveW1HResult {
+  analyze(
+    morphemes: MorphemeToken[],
+    dependencies: DependencyRelation[],
+    chunks?: Chunk[],
+    chunkDependencies?: ChunkDependency[],
+  ): FiveW1HResult {
     const result: FiveW1HResult = {
       who: [],
       what: [],
@@ -18,16 +25,198 @@ export class FiveW1HAnalyzer {
       how: []
     };
 
-    // Extract each category
-    result.who = this.extractWho(morphemes, dependencies);
-    result.what = this.extractWhat(morphemes, dependencies);
-    result.when = this.extractWhen(morphemes, dependencies);
-    result.where = this.extractWhere(morphemes, dependencies);
-    result.why = this.extractWhy(morphemes, dependencies);
-    result.how = this.extractHow(morphemes, dependencies);
+    if (chunks && chunks.length > 0) {
+      result.who   = this.extractWhoFromChunks(morphemes, chunks);
+      result.what  = this.extractWhatFromChunks(morphemes, chunks);
+      result.when  = this.extractWhenFromChunks(morphemes, chunks);
+      result.where = this.extractWhereFromChunks(morphemes, chunks);
+      result.why   = this.extractWhyFromChunks(morphemes, chunks);
+      result.how   = this.extractHowFromChunks(morphemes, chunks);
+    } else {
+      // Fallback: morpheme-level analysis
+      result.who   = this.extractWho(morphemes, dependencies);
+      result.what  = this.extractWhat(morphemes, dependencies);
+      result.when  = this.extractWhen(morphemes, dependencies);
+      result.where = this.extractWhere(morphemes, dependencies);
+      result.why   = this.extractWhy(morphemes, dependencies);
+      result.how   = this.extractHow(morphemes, dependencies);
+    }
 
     return result;
   }
+
+  // -----------------------------------------------------------------------
+  // Chunk-based extraction (primary path, uses CaboCha bunsetsu output)
+  // -----------------------------------------------------------------------
+
+  /** 誰が: chunks marked with が/は/も (subject/topic particles) */
+  private extractWhoFromChunks(morphemes: MorphemeToken[], chunks: Chunk[]): FiveW1HElement[] {
+    const elements: FiveW1HElement[] = [];
+    for (const chunk of chunks) {
+      const func = chunk.funcIndex >= 0 ? morphemes[chunk.funcIndex] : null;
+      const funcSurface = func?.surface_form ?? '';
+      const head = morphemes[chunk.headIndex];
+
+      if (funcSurface === 'が' || funcSurface === 'は' || funcSurface === 'も') {
+        if (head.pos === '名詞' || head.pos === '代名詞' ||
+            (head.pos === '名詞' && head.pos_detail_1 === '固有名詞')) {
+          const confidence = funcSurface === 'が' ? 0.9 : 0.75;
+          elements.push({
+            category: 'who',
+            text: this.chunkSurface(morphemes, chunk),
+            morphemeIndices: chunk.morphemeIndices,
+            confidence,
+          });
+        }
+      } else if (this.isPersonNoun(head.surface_form)) {
+        elements.push({
+          category: 'who',
+          text: head.surface_form,
+          morphemeIndices: [chunk.headIndex],
+          confidence: 0.4,
+        });
+      }
+    }
+    return elements;
+  }
+
+  /** 何を: verb chunks + chunks marked with を */
+  private extractWhatFromChunks(morphemes: MorphemeToken[], chunks: Chunk[]): FiveW1HElement[] {
+    const elements: FiveW1HElement[] = [];
+    for (const chunk of chunks) {
+      const func = chunk.funcIndex >= 0 ? morphemes[chunk.funcIndex] : null;
+      const funcSurface = func?.surface_form ?? '';
+      const head = morphemes[chunk.headIndex];
+
+      if (funcSurface === 'を') {
+        elements.push({
+          category: 'what',
+          text: this.chunkSurface(morphemes, chunk),
+          morphemeIndices: chunk.morphemeIndices,
+          confidence: 0.85,
+        });
+      } else if (head.pos === '動詞' && chunk.funcIndex === -1) {
+        elements.push({
+          category: 'what',
+          text: head.basic_form,
+          morphemeIndices: [chunk.headIndex],
+          confidence: 0.7,
+        });
+      }
+    }
+    return elements;
+  }
+
+  /** いつ: chunks containing time-related expressions */
+  private extractWhenFromChunks(morphemes: MorphemeToken[], chunks: Chunk[]): FiveW1HElement[] {
+    const elements: FiveW1HElement[] = [];
+    for (const chunk of chunks) {
+      const head = morphemes[chunk.headIndex];
+      if (this.isTimeExpression(head.surface_form)) {
+        elements.push({
+          category: 'when',
+          text: this.chunkSurface(morphemes, chunk),
+          morphemeIndices: chunk.morphemeIndices,
+          confidence: 0.9,
+        });
+      } else if (head.pos === '副詞' && this.isTimeAdverb(head.surface_form)) {
+        elements.push({
+          category: 'when',
+          text: head.surface_form,
+          morphemeIndices: [chunk.headIndex],
+          confidence: 0.8,
+        });
+      }
+    }
+    return elements;
+  }
+
+  /** どこで: chunks marked with location particles / proper-noun locations */
+  private extractWhereFromChunks(morphemes: MorphemeToken[], chunks: Chunk[]): FiveW1HElement[] {
+    const elements: FiveW1HElement[] = [];
+    for (const chunk of chunks) {
+      const func = chunk.funcIndex >= 0 ? morphemes[chunk.funcIndex] : null;
+      const funcSurface = func?.surface_form ?? '';
+      const head = morphemes[chunk.headIndex];
+
+      const hasLocationParticle = ['に', 'で', 'へ', 'から'].includes(funcSurface);
+
+      if (hasLocationParticle && head.pos === '名詞') {
+        elements.push({
+          category: 'where',
+          text: this.chunkSurface(morphemes, chunk),
+          morphemeIndices: chunk.morphemeIndices,
+          confidence: 0.8,
+        });
+      } else if (
+        head.pos === '名詞' &&
+        head.pos_detail_1 === '固有名詞' &&
+        head.pos_detail_2 === '地域'
+      ) {
+        elements.push({
+          category: 'where',
+          text: head.surface_form,
+          morphemeIndices: [chunk.headIndex],
+          confidence: 0.9,
+        });
+      }
+    }
+    return elements;
+  }
+
+  /** なぜ: chunks whose functional word is a reason marker */
+  private extractWhyFromChunks(morphemes: MorphemeToken[], chunks: Chunk[]): FiveW1HElement[] {
+    const elements: FiveW1HElement[] = [];
+    for (const chunk of chunks) {
+      const func = chunk.funcIndex >= 0 ? morphemes[chunk.funcIndex] : null;
+      const funcSurface = func?.surface_form ?? '';
+      if (this.isReasonMarker(funcSurface)) {
+        elements.push({
+          category: 'why',
+          text: this.chunkSurface(morphemes, chunk),
+          morphemeIndices: chunk.morphemeIndices,
+          confidence: 0.75,
+        });
+      }
+    }
+    return elements;
+  }
+
+  /** どのように: manner adverb chunks + instrumental で chunks */
+  private extractHowFromChunks(morphemes: MorphemeToken[], chunks: Chunk[]): FiveW1HElement[] {
+    const elements: FiveW1HElement[] = [];
+    for (const chunk of chunks) {
+      const func = chunk.funcIndex >= 0 ? morphemes[chunk.funcIndex] : null;
+      const funcSurface = func?.surface_form ?? '';
+      const head = morphemes[chunk.headIndex];
+
+      if (head.pos === '副詞' && this.isMannerAdverb(head.surface_form)) {
+        elements.push({
+          category: 'how',
+          text: head.surface_form,
+          morphemeIndices: [chunk.headIndex],
+          confidence: 0.75,
+        });
+      } else if (funcSurface === 'で' && head.pos === '名詞') {
+        elements.push({
+          category: 'how',
+          text: this.chunkSurface(morphemes, chunk),
+          morphemeIndices: chunk.morphemeIndices,
+          confidence: 0.6,
+        });
+      }
+    }
+    return elements;
+  }
+
+  /** Return the concatenated surface forms of all morphemes in a chunk */
+  private chunkSurface(morphemes: MorphemeToken[], chunk: Chunk): string {
+    return chunk.morphemeIndices.map(i => morphemes[i].surface_form).join('');
+  }
+
+  // -----------------------------------------------------------------------
+  // Morpheme-level fallback methods (legacy path)
+  // -----------------------------------------------------------------------
 
   /**
    * Extract WHO elements (subjects, agents)
@@ -280,7 +469,7 @@ export class FiveW1HAnalyzer {
   }
 
   private isReasonMarker(surface: string): boolean {
-    return ['ので', 'から', 'ため'].includes(surface);
+    return ['ので', 'から', 'ため', 'ために'].includes(surface);
   }
 
   private isMannerAdverb(surface: string): boolean {

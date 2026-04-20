@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { MorphemeToken, DependencyRelation, AnalysisResult } from './types';
+import { MorphemeToken, DependencyRelation, Chunk, ChunkDependency, AnalysisResult } from './types';
 import { DependencyParser } from './dependency-parser';
 import { KuromojiAnalyzer } from './kuromoji-analyzer';
 import { FiveW1HAnalyzer } from './five-w1h-analyzer';
@@ -40,15 +40,18 @@ export default function JapaneseAnalyzer() {
       // Perform morphological analysis using kuromoji
       const morphemes = kuromojiAnalyzer.tokenize(inputText);
 
-      // Perform dependency analysis
-      const dependencies = dependencyParser.parseDependencies(morphemes);
+      // CaboCha-style dependency analysis: bunsetsu segmentation + cascade parsing
+      const { chunks, chunkDependencies, dependencies } =
+        dependencyParser.parseWithChunks(morphemes);
 
-      // Perform 5W1H analysis
-      const fiveW1H = fiveW1HAnalyzer.analyze(morphemes, dependencies);
+      // Perform 5W1H analysis using chunk information
+      const fiveW1H = fiveW1HAnalyzer.analyze(morphemes, dependencies, chunks, chunkDependencies);
 
       setAnalysisResult({
         morphemes,
+        chunks,
         dependencies,
+        chunkDependencies,
         fiveW1H
       });
 
@@ -66,98 +69,115 @@ export default function JapaneseAnalyzer() {
     }
   }, [analysisResult]);
 
+  /**
+   * Render a CaboCha-style bunsetsu dependency graph.
+   * Each node represents a bunsetsu (文節); arrows show chunk-level dependencies.
+   */
   const renderDependencyGraph = () => {
     if (!analysisResult || !svgRef.current) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove(); // Clear previous render
+    svg.selectAll('*').remove();
 
-    const width = 800;
-    const height = 400;
-    const margin = { top: 20, right: 20, bottom: 60, left: 20 };
+    const { morphemes, chunks, chunkDependencies } = analysisResult;
+    if (!chunks || chunks.length === 0) return;
 
-    svg.attr('width', width).attr('height', height);
+    const NODE_W = 100;
+    const NODE_H = 36;
+    const H_GAP = 20;
+    const nodeY = 260;
+    const totalWidth = chunks.length * (NODE_W + H_GAP) + H_GAP;
+    const height = 340;
 
-    const { morphemes, dependencies } = analysisResult;
+    svg.attr('width', Math.max(totalWidth, 600)).attr('height', height);
 
-    // Calculate positions for tokens
-    const tokenWidth = (width - margin.left - margin.right) / morphemes.length;
-    const tokenY = height - margin.bottom;
-    const arcY = tokenY - 40;
-
-    // Draw tokens
-    const tokenGroup = svg.append('g')
-      .attr('transform', `translate(${margin.left}, 0)`);
-
-    tokenGroup.selectAll('.token')
-      .data(morphemes)
-      .enter()
-      .append('g')
-      .attr('class', 'token')
-      .attr('transform', (d, i) => `translate(${i * tokenWidth + tokenWidth / 2}, ${tokenY})`)
-      .each(function(d, i) {
-        const group = d3.select(this);
-        
-        // Token text
-        group.append('text')
-          .attr('text-anchor', 'middle')
-          .attr('dy', '0.35em')
-          .attr('class', 'token-text')
-          .style('font-size', '12px')
-          .style('font-weight', 'bold')
-          .text(d.surface_form);
-
-        // POS tag
-        group.append('text')
-          .attr('text-anchor', 'middle')
-          .attr('dy', '1.5em')
-          .attr('class', 'pos-text')
-          .style('font-size', '10px')
-          .style('fill', '#666')
-          .text(d.pos);
-      });
-
-    // Draw dependency arcs
-    dependencies.forEach(dep => {
-      const fromX = dep.fromIndex * tokenWidth + tokenWidth / 2;
-      const toX = dep.toIndex * tokenWidth + tokenWidth / 2;
-      const controlY = arcY - Math.abs(toX - fromX) * 0.3;
-
-      const path = d3.path();
-      path.moveTo(fromX, tokenY - 30);
-      path.quadraticCurveTo((fromX + toX) / 2, controlY, toX, tokenY - 30);
-
-      svg.append('path')
-        .attr('d', path.toString())
-        .attr('transform', `translate(${margin.left}, 0)`)
-        .style('fill', 'none')
-        .style('stroke', '#007bff')
-        .style('stroke-width', 2)
-        .attr('marker-end', 'url(#arrowhead)');
-
-      // Dependency label
-      svg.append('text')
-        .attr('x', (fromX + toX) / 2 + margin.left)
-        .attr('y', controlY + 10)
-        .attr('text-anchor', 'middle')
-        .style('font-size', '8px')
-        .style('fill', '#007bff')
-        .text(dep.label);
-    });
-
-    // Add arrow marker
+    // Arrow marker
     svg.append('defs')
       .append('marker')
-      .attr('id', 'arrowhead')
+      .attr('id', 'arrow')
       .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 8)
-      .attr('refY', 0)
-      .attr('markerWidth', 6)
-      .attr('markerHeight', 6)
+      .attr('refX', 8).attr('refY', 0)
+      .attr('markerWidth', 6).attr('markerHeight', 6)
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M 0,-5 L 10,0 L 0,5')
-      .style('fill', '#007bff');
+      .style('fill', '#3b82f6');
+
+    // Node centre-x for each chunk
+    const cx = (i: number) => H_GAP + i * (NODE_W + H_GAP) + NODE_W / 2;
+
+    // Draw dependency arcs first (so they appear behind nodes)
+    (chunkDependencies ?? []).forEach(dep => {
+      const x1 = cx(dep.fromChunkIndex);
+      const x2 = cx(dep.toChunkIndex);
+      const span = Math.abs(x2 - x1);
+      const arcHeight = 30 + span * 0.45;
+      const midX = (x1 + x2) / 2;
+      const topY = nodeY - arcHeight;
+
+      const path = d3.path();
+      path.moveTo(x1, nodeY);
+      path.quadraticCurveTo(midX, topY, x2, nodeY);
+
+      svg.append('path')
+        .attr('d', path.toString())
+        .style('fill', 'none')
+        .style('stroke', '#3b82f6')
+        .style('stroke-width', 1.5)
+        .attr('marker-end', 'url(#arrow)');
+
+      svg.append('text')
+        .attr('x', midX)
+        .attr('y', topY - 4)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '9px')
+        .style('fill', '#3b82f6')
+        .text(dep.label);
+    });
+
+    // Draw chunk nodes
+    chunks.forEach((chunk, i) => {
+      const surface = chunk.morphemeIndices.map(idx => morphemes[idx].surface_form).join('');
+      const headPos = morphemes[chunk.headIndex].pos;
+      const isRoot = chunk.link === -1;
+
+      const nodeX = H_GAP + i * (NODE_W + H_GAP);
+
+      const g = svg.append('g').attr('transform', `translate(${nodeX}, ${nodeY - NODE_H / 2})`);
+
+      g.append('rect')
+        .attr('width', NODE_W).attr('height', NODE_H)
+        .attr('rx', 4)
+        .style('fill', isRoot ? '#dcfce7' : '#eff6ff')
+        .style('stroke', isRoot ? '#16a34a' : '#3b82f6')
+        .style('stroke-width', isRoot ? 2 : 1);
+
+      // Chunk surface text
+      g.append('text')
+        .attr('x', NODE_W / 2).attr('y', 14)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '13px')
+        .style('font-weight', 'bold')
+        .style('fill', '#1e293b')
+        .text(surface.length > 8 ? surface.slice(0, 8) + '…' : surface);
+
+      // Head POS label
+      g.append('text')
+        .attr('x', NODE_W / 2).attr('y', 28)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '9px')
+        .style('fill', '#64748b')
+        .text(headPos);
+
+      // Chunk index
+      svg.append('text')
+        .attr('x', nodeX + NODE_W / 2)
+        .attr('y', nodeY + NODE_H / 2 + 14)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '10px')
+        .style('fill', '#94a3b8')
+        .text(`文節${i}`);
+    });
   };
 
   return (
@@ -168,7 +188,7 @@ export default function JapaneseAnalyzer() {
             Japanese Dependency Analyzer
           </h1>
           <p className="text-center text-gray-600 mb-8">
-            日本語文章の形態素解析・係り受け解析ツール
+            日本語文章の形態素解析・係り受け解析ツール（CaboCha方式）
           </p>
 
           {/* Input Section */}
@@ -230,34 +250,87 @@ export default function JapaneseAnalyzer() {
                 </div>
               </div>
 
+              {/* Bunsetsu Chunks (CaboCha-style) */}
+              {analysisResult.chunks && analysisResult.chunks.length > 0 && (
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">文節解析結果（CaboCha方式）</h2>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white border border-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文節番号</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文節</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">主辞</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">機能語</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">係り先</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {analysisResult.chunks.map((chunk, i) => {
+                          const surface = chunk.morphemeIndices
+                            .map(idx => analysisResult.morphemes[idx].surface_form)
+                            .join('');
+                          const head = analysisResult.morphemes[chunk.headIndex];
+                          const func = chunk.funcIndex >= 0
+                            ? analysisResult.morphemes[chunk.funcIndex]
+                            : null;
+                          const isRoot = chunk.link === -1;
+                          return (
+                            <tr key={i} className={isRoot ? 'bg-green-50' : ''}>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {i}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {surface}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {head.surface_form}（{head.pos}）
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {func ? `${func.surface_form}（${func.pos}）` : '—'}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {isRoot ? 'ROOT' : `文節${chunk.link}`}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Dependency Graph */}
               <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">係り受け関係グラフ</h2>
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">係り受け関係グラフ（文節単位）</h2>
                 <div className="border border-gray-200 rounded-lg p-4 bg-white overflow-x-auto">
                   <svg ref={svgRef}></svg>
                 </div>
               </div>
 
-              {/* Dependency Analysis Results */}
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">係り受け解析結果</h2>
-                <div className="space-y-2">
-                  {analysisResult.dependencies.map((dep, index) => (
-                    <div key={index} className="bg-gray-50 p-3 rounded border">
-                      <span className="font-medium text-blue-600">
-                        {analysisResult.morphemes[dep.fromIndex].surface_form}
-                      </span>
-                      <span className="mx-2 text-gray-500">→</span>
-                      <span className="font-medium text-green-600">
-                        {analysisResult.morphemes[dep.toIndex].surface_form}
-                      </span>
-                      <span className="ml-4 text-sm text-gray-600">
-                        ({dep.label})
-                      </span>
-                    </div>
-                  ))}
+              {/* Chunk-level Dependency Analysis Results */}
+              {analysisResult.chunkDependencies && analysisResult.chunkDependencies.length > 0 && (
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">係り受け解析結果</h2>
+                  <div className="space-y-2">
+                    {analysisResult.chunkDependencies.map((dep, index) => {
+                      const fromSurface = analysisResult.chunks[dep.fromChunkIndex].morphemeIndices
+                        .map(i => analysisResult.morphemes[i].surface_form).join('');
+                      const toSurface = analysisResult.chunks[dep.toChunkIndex].morphemeIndices
+                        .map(i => analysisResult.morphemes[i].surface_form).join('');
+                      return (
+                        <div key={index} className="bg-gray-50 p-3 rounded border">
+                          <span className="font-medium text-blue-600">{fromSurface}</span>
+                          <span className="mx-2 text-gray-500">→</span>
+                          <span className="font-medium text-green-600">{toSurface}</span>
+                          <span className="ml-4 text-sm text-gray-600">({dep.label})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 5W1H Analysis Results */}
               {analysisResult.fiveW1H && (

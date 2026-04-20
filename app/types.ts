@@ -19,6 +19,21 @@ export interface DependencyRelation {
   label: string;           // 関係ラベル
 }
 
+// Types for bunsetsu (文節) chunks - CaboCha style
+export interface Chunk {
+  morphemeIndices: number[];  // この文節に属する形態素のインデックス
+  headIndex: number;          // 自立語（主辞）の形態素インデックス
+  funcIndex: number;          // 機能語（助詞/助動詞）の形態素インデックス (-1 if none)
+  link: number;               // 係り先の文節インデックス (-1 = root)
+}
+
+// Chunk-level dependency relation
+export interface ChunkDependency {
+  fromChunkIndex: number;   // 係り元の文節インデックス
+  toChunkIndex: number;     // 係り先の文節インデックス
+  label: string;            // 関係ラベル
+}
+
 // Types for 5W1H analysis
 export interface FiveW1HElement {
   category: 'who' | 'what' | 'when' | 'where' | 'why' | 'how';  // 5W1H カテゴリ
@@ -38,6 +53,8 @@ export interface FiveW1HResult {
 
 export interface AnalysisResult {
   morphemes: MorphemeToken[];
+  chunks: Chunk[];
   dependencies: DependencyRelation[];
+  chunkDependencies: ChunkDependency[];
   fiveW1H?: FiveW1HResult;
 }
