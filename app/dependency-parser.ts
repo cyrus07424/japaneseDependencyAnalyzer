@@ -74,9 +74,9 @@ export class DependencyParser {
   /** True when the morpheme acts as a self-standing word that opens a new bunsetsu */
   private isIndependentWord(m: MorphemeToken): boolean {
     // Nominal suffixes and non-independent forms attach to the previous chunk
-    if (m.pos === '名詞' &&
-        (m.pos_detail_1 === '接尾' || m.pos_detail_1 === '非自立')) return false;
-    if (m.pos === '動詞' && m.pos_detail_1 === '非自立') return false;
+    const detail = m.pos_detail_1;
+    if ((m.pos === '名詞' || m.pos === '動詞') && detail === '非自立') return false;
+    if (m.pos === '名詞' && detail === '接尾') return false;
     return INDEPENDENT_POS.has(m.pos);
   }
 
@@ -186,7 +186,10 @@ export class DependencyParser {
     }
 
     // 4. Case markers → nearest right predicate
-    if (['に', 'で', 'へ', 'から', 'より'].includes(funcSurface)) {
+    // Disambiguate 'で': 格助詞 (case) vs 接続助詞 (conjunctive)
+    const deIsCase =
+      funcSurface === 'で' && func?.pos_detail_1 !== '接続助詞';
+    if (['に', 'へ', 'から', 'より'].includes(funcSurface) || deIsCase) {
       for (let j = i + 1; j <= last; j++) {
         const pos = morphemes[chunks[j].headIndex].pos;
         if (pos === '動詞' || pos === '形容詞' || pos === '形容動詞') return j;
@@ -232,12 +235,14 @@ export class DependencyParser {
       }
     }
 
-    // 10. Verbal conjunctive (連用形 / て form) → nearest right verb
+    // 10. Verbal conjunctive (連用形 / て form / conjunctive で) → nearest right verb
+    const deIsConjunctive =
+      funcSurface === 'で' && func?.pos_detail_1 === '接続助詞';
     if (
       head.pos === '動詞' &&
       (head.conjugated_form === '連用形' ||
         funcSurface === 'て' ||
-        funcSurface === 'で')
+        deIsConjunctive)
     ) {
       for (let j = i + 1; j <= last; j++) {
         if (morphemes[chunks[j].headIndex].pos === '動詞') return j;

@@ -58,8 +58,7 @@ export class FiveW1HAnalyzer {
       const head = morphemes[chunk.headIndex];
 
       if (funcSurface === 'が' || funcSurface === 'は' || funcSurface === 'も') {
-        if (head.pos === '名詞' || head.pos === '代名詞' ||
-            (head.pos === '名詞' && head.pos_detail_1 === '固有名詞')) {
+        if (head.pos === '名詞' || head.pos === '代名詞') {
           const confidence = funcSurface === 'が' ? 0.9 : 0.75;
           elements.push({
             category: 'who',
